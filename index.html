@@ -3,315 +3,263 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>JJK: Cursed Battle v2</title>
+    <title>JJK: Cursed Battle v3</title>
     <style>
-        :root {
-            --bg-color: #0a0a0a;
-            --accent-blue: #00d4ff;
-            --accent-red: #ff004c;
-        }
-
-        body {
-            margin: 0; background: var(--bg-color); color: white;
-            font-family: 'Courier New', Courier, monospace; overflow: hidden;
-            user-select: none; -webkit-tap-highlight-color: transparent;
-        }
-
-        /* Pantallas */
-        .screen {
-            position: fixed; inset: 0; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; background: #000; z-index: 100;
-            padding: 20px; text-align: center;
-        }
-
+        :root { --bg: #050505; --blue: #00d4ff; --red: #ff004c; --gold: #ffcc00; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; touch-action: manipulation; }
+        .screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; z-index: 100; padding: 20px; }
         .hidden { display: none !important; }
-
+        
         /* HUD */
-        #game-ui { display: flex; flex-direction: column; height: 100vh; }
         .hud { display: flex; justify-content: space-between; padding: 15px; background: #111; border-bottom: 2px solid #333; }
         .stat-box { width: 45%; }
-        .hp-container { height: 15px; background: #222; border: 1px solid #444; margin: 5px 0; position: relative; }
-        .hp-bar { height: 100%; transition: width 0.4s, background-color 0.4s; }
-        .ce-bar { font-size: 12px; font-weight: bold; text-shadow: 1px 1px #000; }
+        .hp-bar-bg { height: 12px; background: #222; border-radius: 6px; margin: 5px 0; overflow: hidden; }
+        .hp-fill { height: 100%; width: 100%; transition: width 0.3s; }
+        .ce-text { font-size: 14px; font-weight: bold; color: var(--blue); }
 
-        /* Log de Batalla */
-        #battle-log {
-            flex-grow: 1; overflow-y: auto; padding: 15px; font-size: 14px;
-            background: linear-gradient(to bottom, #0a0a0a, #1a1a1a);
-            border-bottom: 1px solid #333; display: flex; flex-direction: column;
-        }
-        .log-entry { margin-bottom: 8px; border-left: 3px solid var(--accent-blue); padding-left: 8px; animation: fadeIn 0.3s; }
-        .special-event { color: #ffcc00; font-weight: bold; text-transform: uppercase; font-size: 1.1em; border-left-color: #ff0000; }
+        /* Log */
+        #log { flex-grow: 1; overflow-y: auto; padding: 15px; font-size: 14px; display: flex; flex-direction: column-reverse; background: #0a0a0a; }
+        .log-msg { margin-bottom: 5px; padding: 5px; border-left: 3px solid #444; animation: slideIn 0.2s; }
+        .log-special { border-left-color: var(--gold); color: var(--gold); font-weight: bold; }
 
         /* Controles */
-        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 15px; background: #000; }
-        .btn {
-            background: #1a1a1a; border: 1px solid #444; color: white; padding: 12px 5px;
-            border-radius: 4px; display: flex; flex-direction: column; align-items: center;
-            font-size: 11px; cursor: pointer; position: relative;
-        }
-        .btn:active { background: #333; transform: translateY(2px); }
-        .btn.selected { border-color: var(--accent-blue); box-shadow: 0 0 10px var(--accent-blue); }
-        .btn .cost { font-size: 9px; color: #00d4ff; margin-top: 4px; }
+        .controls { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 15px; background: #000; }
+        .btn { background: #1a1a1a; border: 1px solid #444; color: white; padding: 12px; border-radius: 8px; font-size: 12px; display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+        .btn:active { background: #333; }
+        .btn.disabled { opacity: 0.3; pointer-events: none; }
+        .cost { font-size: 10px; color: var(--blue); }
 
-        /* Selección de Personajes */
-        .char-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; overflow-y: auto; margin-top: 10px; }
-        .char-card { background: #222; padding: 10px; border: 1px solid #444; border-radius: 5px; font-size: 14px; }
-        .tab-btn { padding: 10px; background: #333; border: none; color: white; flex: 1; cursor: pointer; }
-        .tab-btn.active { background: var(--accent-blue); }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes flashRed { 0% { background: #ff0000; } 100% { background: #000; } }
-        .flash-red { animation: flashRed 0.2s 2; }
+        /* Selección */
+        .char-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-top: 15px; overflow-y: auto; }
+        .char-card { background: #222; padding: 15px; border: 1px solid #444; border-radius: 10px; text-align: center; }
+        
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
     </style>
 </head>
 <body>
 
-    <!-- ELEMENTOS DE AUDIO (Pre-cargados para el futuro) -->
-    <audio id="sfx-hit" src=""></audio>
-    <audio id="sfx-blackflash" src=""></audio>
-    <audio id="sfx-domain" src=""></audio>
-    <audio id="sfx-death" src=""></audio>
-    <audio id="sfx-select" src=""></audio>
+    <!-- Sonidos -->
+    <audio id="sfx-hit"></audio>
+    <audio id="sfx-blackflash"></audio>
+    <audio id="sfx-awake"></audio>
 
-    <!-- PANTALLA DE INICIO -->
+    <!-- Pantalla Inicio -->
     <div id="start-screen" class="screen">
-        <h1>呪術廻戦<br>CURSED BATTLE</h1>
-        <button onclick="showSelection('single')" style="width:200px; padding:15px; margin:10px;">SINGLE PLAYER</button>
-        <button onclick="showSelection('local')" style="width:200px; padding:15px; margin:10px;">LOCAL 1 VS 1</button>
+        <h1 style="color:var(--red); letter-spacing: 5px;">JUJUTSU BATTLE</h1>
+        <button class="btn" style="width:200px; margin-bottom:10px" onclick="initSelection('single')">SINGLE PLAYER</button>
+        <button class="btn" style="width:200px" onclick="initSelection('local')">LOCAL 1 VS 1</button>
     </div>
 
-    <!-- PANTALLA DE SELECCIÓN -->
+    <!-- Pantalla Selección -->
     <div id="selection-screen" class="screen hidden">
-        <h2 id="selection-title">JUGADOR 1 ELIGE</h2>
-        <div id="timer-ui" style="color:red; font-size:24px; font-weight:bold;">10</div>
-        <div style="display:flex; width:100%; margin:10px 0;">
-            <button id="tab-sorcerer" class="tab-btn active" onclick="switchTab('sorcerers')">HECHICEROS</button>
-            <button id="tab-curse" class="tab-btn" onclick="switchTab('curses')">MALDICIONES</button>
-        </div>
-        <div id="char-list" class="char-grid"></div>
+        <h2 id="sel-title">JUGADOR 1 ELIGE</h2>
+        <div id="sel-timer" style="font-size:30px; color:var(--red)">10</div>
+        <div class="char-grid" id="char-list"></div>
     </div>
 
-    <!-- INTERFAZ DE JUEGO -->
-    <div id="game-ui" class="hidden">
+    <!-- Interfaz de Juego -->
+    <div id="game-ui" style="display:flex; flex-direction:column; height:100vh;" class="hidden">
         <div class="hud">
             <div class="stat-box">
-                <div id="p1-name" style="font-size:12px; color:var(--accent-blue);">PLAYER</div>
-                <div class="hp-container"><div id="p1-hp" class="hp-bar" style="width:100%; background: #2ecc71;"></div></div>
-                <div id="p1-ce" class="ce-bar">E: 2</div>
+                <span id="p1-name">---</span>
+                <div class="hp-bar-bg"><div id="p1-hp" class="hp-fill" style="background:#2ecc71"></div></div>
+                <div id="p1-ce" class="ce-text">E: 2</div>
             </div>
             <div class="stat-box" style="text-align: right;">
-                <div id="p2-name" style="font-size:12px; color:var(--accent-red);">CPU</div>
-                <div class="hp-container"><div id="p2-hp" class="hp-bar" style="width:100%; background: #2ecc71;"></div></div>
-                <div id="p2-ce" class="ce-bar">E: 2</div>
+                <span id="p2-name">---</span>
+                <div class="hp-bar-bg"><div id="p2-hp" class="hp-fill" style="background:#2ecc71"></div></div>
+                <div id="p2-ce" class="ce-text">E: 2</div>
             </div>
         </div>
 
-        <div id="battle-log"></div>
+        <div id="log"></div>
 
-        <div id="action-controls" class="controls">
-            <button class="btn" onclick="handleInput('GN')"><span>👊 GN</span><span class="cost">0 E</span></button>
-            <button class="btn" onclick="handleInput('GE')"><span>🔥 GE</span><span class="cost">1 E</span></button>
-            <button class="btn" onclick="handleInput('BN')"><span>🛡️ BN</span><span class="cost">0 E</span></button>
-            <button class="btn" onclick="handleInput('BE')"><span>💧 BE</span><span class="cost">1 E</span></button>
-            <button class="btn" onclick="handleInput('T')"><span id="txt-tech">⚔️ TÉCNICA</span><span id="cost-tech" class="cost">3 E</span></button>
-            <button class="btn" onclick="handleInput('A')"><span id="txt-awake">👁️ DESPERTAR</span><span id="cost-awake" class="cost">10 E</span></button>
+        <div id="controls" class="controls">
+            <div id="p-turn-indicator" style="grid-column: span 2; text-align: center; font-size: 12px; color: var(--gold);"></div>
+            <button class="btn" onclick="playTurn('GN')">👊 GN <span class="cost">0 E</span></button>
+            <button class="btn" onclick="playTurn('GE')">🔥 GE <span class="cost">1 E</span></button>
+            <button class="btn" onclick="playTurn('BN')">🛡️ BN <span class="cost">0 E</span></button>
+            <button class="btn" onclick="playTurn('BE')">💧 BE <span class="cost">1 E</span></button>
+            <button class="btn" id="btn-tech" onclick="playTurn('T')">⚔️ TÉCNICA <span class="cost">3 E</span></button>
+            <button class="btn" id="btn-awake" onclick="playTurn('A')">👁️ DESPERTAR <span class="cost">10 E</span></button>
         </div>
     </div>
 
 <script>
-// --- DATOS DE PERSONAJES ---
-const DATA = {
-    sorcerers: [
-        { id: 'yuji', name: 'Yuji Itadori', tech: 'G. Concentrado', techCost: 3, awake: 'Sukuna', awakeCost: 10, type: 'GN' },
-        { id: 'gojo', name: 'Satoru Gojo', tech: 'Seis Ojos', techCost: 3, awake: 'Vacio Infinito', awakeCost: 10, type: 'GE' },
-        { id: 'hakari', name: 'Kinji Hakari', tech: 'Puerta', techCost: 3, awake: 'Idle Death', awakeCost: 10, type: 'GN' },
-        { id: 'higuruma', name: 'H. Higuruma', tech: 'Masazo', techCost: 3, awake: 'Juicio', awakeCost: 10, type: 'GN' },
-        { id: 'megumi', name: 'M. Fushiguro', tech: 'Sombras I', techCost: 3, awake: 'Agonía', awakeCost: 8, type: 'GN' },
-        { id: 'yuta', name: 'Yuta Okkotsu', tech: 'Copiar I', techCost: 3, awake: 'Rika', awakeCost: 10, type: 'GE' },
-        { id: 'geto', name: 'Geto Suguru', tech: 'Maldiciones', techCost: 3, awake: 'Uzumaki', awakeCost: 10, type: 'GN' }
-    ],
-    curses: [
-        { id: 'mahito', name: 'Mahito', tech: 'Transfigurar', techCost: 3, awake: 'Inspiración', awakeCost: 10, type: 'GN' },
-        { id: 'jogo', name: 'Jogo', tech: 'Bola Fuego', techCost: 3, awake: 'Ataúd', awakeCost: 8, type: 'GE' },
-        { id: 'hanami', name: 'Hanami', tech: 'Raíces', techCost: 3, awake: 'Mar Flores', awakeCost: 8, type: 'GN' },
-        { id: 'dagon', name: 'Dagon', tech: 'Disparo Agua', techCost: 3, awake: 'Ira', awakeCost: 8, type: 'GN' },
-        { id: 'metro', name: 'M. Metro', tech: 'Mordida', techCost: 3, awake: '¡Veneno!', awakeCost: 8, type: 'GN' },
-        { id: 'naoya', name: 'Naoya Zenin', tech: '24 Frames', techCost: 3, awake: 'Reencarnar', awakeCost: 10, type: 'GN' },
-        { id: 'kuro', name: 'Kurouroshi', tech: 'Corte', techCost: 3, awake: 'Horda', awakeCost: 8, type: 'GN' }
-    ]
-};
+const CHARS = [
+    { id: 'yuji', name: 'Yuji Itadori', type: 'GN', tech: 'Golpe Concentrado', techCost: 3, awake: 'Sukuna', awakeCost: 10 },
+    { id: 'mahito', name: 'Mahito', type: 'GN', tech: 'Humanos Transf.', techCost: 3, awake: 'Inspiración', awakeCost: 10 },
+    { id: 'gojo', name: 'Satoru Gojo', type: 'GE', tech: 'Seis Ojos', techCost: 3, awake: 'Vacio Infinito', awakeCost: 10 },
+    { id: 'jogo', name: 'Jogo', type: 'GE', tech: 'Bola de Fuego', techCost: 3, awake: 'Expansión', awakeCost: 8 }
+];
 
-let game = {
+let state = {
     mode: 'single',
     turn: 1,
-    p1: { hp: 750, ce: 2, char: null, move: null, bfProb: 25, isAwake: false },
-    p2: { hp: 750, ce: 2, char: null, move: null, bfProb: 25, isAwake: false },
-    currentTab: 'sorcerers',
     selectingFor: 1,
-    timerInt: null
+    timer: 10,
+    interval: null,
+    p1: { hp: 750, ce: 2, char: null, move: null, awake: 0, bfProb: 25, bfCount: 0, domain: 0 },
+    p2: { hp: 750, ce: 2, char: null, move: null, awake: 0, bfProb: 25, bfCount: 0, domain: 0 },
+    activeP: 1
 };
 
-// --- SONIDOS ---
-function playSfx(id) {
-    const sfx = document.getElementById('sfx-' + id);
-    if(sfx && sfx.src !== "") {
-        sfx.currentTime = 0;
-        sfx.play().catch(e => console.log("Audio interact-lock"));
-    }
-}
+function playSfx(id) { /* Función para futuro */ }
 
 // --- SELECCIÓN ---
-function showSelection(mode) {
-    game.mode = mode;
+function initSelection(mode) {
+    state.mode = mode;
     document.getElementById('start-screen').classList.add('hidden');
     document.getElementById('selection-screen').classList.remove('hidden');
-    renderCharList();
+    renderChars();
     startTimer();
 }
 
-function switchTab(tab) {
-    game.currentTab = tab;
-    document.getElementById('tab-sorcerer').className = tab === 'sorcerers' ? 'tab-btn active' : 'tab-btn';
-    document.getElementById('tab-curse').className = tab === 'curses' ? 'tab-btn active' : 'tab-btn';
-    renderCharList();
-}
-
-function renderCharList() {
+function renderChars() {
     const list = document.getElementById('char-list');
     list.innerHTML = '';
-    DATA[game.currentTab].forEach(char => {
+    CHARS.forEach(c => {
         const div = document.createElement('div');
         div.className = 'char-card';
-        div.innerHTML = `<strong>${char.name}</strong><br><small>${char.tech}</small>`;
-        div.onclick = () => selectChar(char);
+        div.innerHTML = `<strong>${c.name}</strong><br><small>${c.tech}</small>`;
+        div.onclick = () => selectChar(c);
         list.appendChild(div);
     });
 }
 
 function startTimer() {
-    let timeLeft = 10;
-    const ui = document.getElementById('timer-ui');
-    clearInterval(game.timerInt);
-    game.timerInt = setInterval(() => {
-        timeLeft--;
-        ui.innerText = timeLeft;
-        if(timeLeft <= 0) {
-            const all = [...DATA.sorcerers, ...DATA.curses];
-            selectChar(all[Math.floor(Math.random()*all.length)]);
-        }
+    state.timer = 10;
+    clearInterval(state.interval);
+    state.interval = setInterval(() => {
+        state.timer--;
+        document.getElementById('sel-timer').innerText = state.timer;
+        if(state.timer <= 0) selectChar(CHARS[Math.floor(Math.random()*CHARS.length)]);
     }, 1000);
 }
 
 function selectChar(char) {
-    playSfx('select');
-    if(game.selectingFor === 1) {
-        game.p1.char = char;
-        if(game.mode === 'single') {
-            const all = [...DATA.sorcerers, ...DATA.curses];
-            game.p2.char = all[Math.floor(Math.random()*all.length)];
+    if(state.selectingFor === 1) {
+        state.p1.char = JSON.parse(JSON.stringify(char));
+        state.selectingFor = 2;
+        if(state.mode === 'single') {
+            state.p2.char = JSON.parse(JSON.stringify(CHARS[Math.floor(Math.random()*CHARS.length)]));
             startGame();
         } else {
-            game.selectingFor = 2;
-            document.getElementById('selection-title').innerText = "JUGADOR 2 ELIGE";
+            document.getElementById('sel-title').innerText = "JUGADOR 2 ELIGE";
             startTimer();
         }
     } else {
-        game.p2.char = char;
+        state.p2.char = JSON.parse(JSON.stringify(char));
         startGame();
     }
 }
 
 function startGame() {
-    clearInterval(game.timerInt);
+    clearInterval(state.interval);
     document.getElementById('selection-screen').classList.add('hidden');
     document.getElementById('game-ui').classList.remove('hidden');
-    document.getElementById('p1-name').innerText = game.p1.char.name;
-    document.getElementById('p2-name').innerText = game.p2.char.name;
     updateUI();
-    addLog("¡COMIENZA EL COMBATE!", "special-event");
+    addLog("¡COMIENZA EL DUELO!", true);
 }
 
-// --- LÓGICA DE COMBATE ---
-function handleInput(move) {
-    const p1 = game.p1;
-    const cost = getCost(move, p1);
-    
-    if(p1.ce < cost) return alert("Sin Energía Maldita");
+// --- TURNO ---
+function playTurn(move) {
+    const current = state.activeP === 1 ? state.p1 : state.p2;
+    if(current.ce < getCost(move, current)) return;
 
-    p1.move = move;
-    
-    if(game.mode === 'single') {
-        game.p2.move = cpuBrain();
-        resolveTurn();
+    current.move = move;
+
+    if(state.mode === 'single') {
+        state.p2.move = cpuMove();
+        processBattle();
     } else {
-        // En local ocultamos para el P2
-        document.getElementById('action-controls').style.opacity = "0";
-        alert("P2 Elige...");
-        // (Simulación local por brevedad)
-        game.p2.move = 'GN'; 
-        document.getElementById('action-controls').style.opacity = "1";
-        resolveTurn();
+        if(state.activeP === 1) {
+            state.activeP = 2;
+            document.getElementById('controls').classList.add('hidden');
+            setTimeout(() => {
+                alert("Turno de Jugador 2");
+                document.getElementById('controls').classList.remove('hidden');
+                updateUI();
+            }, 100);
+        } else {
+            state.activeP = 1;
+            processBattle();
+        }
     }
 }
 
-function getCost(move, p) {
-    if(move === 'GE' || move === 'BE') return 1;
-    if(move === 'T') return p.char.techCost;
-    if(move === 'A') return p.char.awakeCost;
-    return 0;
-}
+function processBattle() {
+    // 1. Calcular Daños
+    const r1 = calcEffect(state.p1, state.p2);
+    const r2 = calcEffect(state.p2, state.p1);
 
-function resolveTurn() {
-    const res1 = calculateDamage(game.p1, game.p2);
-    const res2 = calculateDamage(game.p2, game.p1);
+    // 2. Aplicar Daños y Gastos
+    applyResult(state.p1, state.p2, r1);
+    applyResult(state.p2, state.p1, r2);
 
-    // Aplicar
-    game.p2.hp -= res1.dmg;
-    game.p1.hp -= res2.dmg;
-    
-    // Gastar Energía
-    game.p1.ce -= getCost(game.p1.move, game.p1);
-    game.p2.ce -= getCost(game.p2.move, game.p2);
+    // 3. Efectos de fin de turno (Dominios)
+    handlePostTurn();
 
-    // Logs
-    addLog(`${game.p1.char.name}: ${res1.msg} (-${res1.dmg} HP)`);
-    addLog(`${game.p2.char.name}: ${res2.msg} (-${res2.dmg} HP)`);
-
-    game.turn++;
+    // 4. Energía y Siguiente Turno
+    state.turn++;
     distributeCE();
     updateUI();
-    checkWin();
+    checkGameOver();
 }
 
-function calculateDamage(atk, def) {
+function calcEffect(atk, def) {
     let dmg = 0;
     let type = 'GN';
     let msg = "";
+    const isSukuna = (atk.char.id === 'yuji' && atk.awake > 0);
+    const isMahitoAwake = (atk.char.id === 'mahito' && atk.awake > 0);
 
-    switch(atk.move) {
-        case 'GN': dmg = 50; type = 'GN'; msg = "Golpe Normal"; break;
-        case 'GE': dmg = 75; type = 'GE'; msg = "Golpe Energía"; break;
-        case 'T':
+    // Movimientos Básicos
+    if(atk.move === 'GN') { dmg = 50; type = 'GN'; msg = "Golpe Normal"; }
+    if(atk.move === 'GE') { dmg = 75; type = 'GE'; msg = "Golpe Energía"; }
+
+    // TÉCNICAS
+    if(atk.move === 'T') {
+        if(!isSukuna && !isMahitoAwake) {
             dmg = 100; type = atk.char.type; msg = atk.char.tech;
-            // Lógica Black Flash (Ejemplo Yuji)
+            // Lógica Black Flash Yuji
             if(atk.char.id === 'yuji') {
-                if(Math.random() * 100 < atk.bfProb) {
-                    dmg *= 1.5;
-                    atk.bfProb = Math.min(100, atk.bfProb + 25);
-                    msg = "¡BLACK FLASH! ⚡";
-                    addLog("¡DESTELLO NEGRO!", "special-event");
-                    playSfx('blackflash');
-                } else {
-                    atk.bfProb = 25;
-                }
+                if(Math.random()*100 < atk.bfProb) {
+                    dmg *= 1.5; atk.bfProb += 25; type = 'GE'; msg = "¡BLACK FLASH! ⚡";
+                } else { atk.bfProb = 25; }
             }
-            break;
-        case 'A':
-            atk.isAwake = true;
-            msg = "¡DESPERTAR!";
-            playSfx('domain');
-            break;
+        } 
+        else if(isSukuna) {
+            dmg = 100; type = 'GE'; msg = "Desmantelar";
+        }
+        else if(isMahitoAwake) {
+            let bfBase = atk.bfCount === 0 ? 10 : 20;
+            if(Math.random()*100 < bfBase) {
+                atk.bfCount++;
+                dmg = 150 * 1.5; type = 'GE'; msg = "¡BLACK FLASH! ⚡";
+            } else {
+                dmg = (atk.bfCount >= 2) ? 200 : 150;
+                type = (atk.bfCount >= 2) ? 'GN' : 'GE';
+                msg = (atk.bfCount >= 2) ? "Cortes" : "Transfiguración";
+            }
+        }
+    }
+
+    // DESPERTAR / ULTI
+    if(atk.move === 'A') {
+        if(atk.awake === 0) {
+            atk.awake = 8;
+            msg = "¡DESPERTAR: " + (atk.char.id === 'yuji' ? "SUKUNA" : "INSPIRACIÓN") + "!";
+        } else {
+            // Si ya está despierto, el botón de despertar es la ULTI
+            if(atk.char.id === 'yuji') {
+                atk.domain = 3;
+                msg = "EXPANSIÓN DE DOMINIO: MALEVOLENT SHRINE";
+            } else if(atk.char.id === 'mahito') {
+                atk.domain = 3;
+                msg = "EXPANSIÓN: AUTOENCARNACIÓN DE LA PERFECCIÓN";
+            }
+        }
     }
 
     // Bloqueos
@@ -321,51 +269,80 @@ function calculateDamage(atk, def) {
     return { dmg, msg };
 }
 
-function distributeCE() {
-    let gain = 1;
-    const t = game.turn;
-    if(t === 1) gain = 0;
-    else if(t % 5 === 0) gain = 3;
-    else if(t % 2 === 0) gain = 2;
-    
-    game.p1.ce = Math.min(15, game.p1.ce + gain);
-    game.p2.ce = Math.min(15, game.p2.ce + gain);
+function handlePostTurn() {
+    [state.p1, state.p2].forEach((p, index) => {
+        const opp = (index === 0) ? state.p2 : state.p1;
+        
+        // Sukuna Shrine
+        if(p.domain > 0 && p.char.id === 'yuji') {
+            opp.hp -= 100;
+            addLog("Malevolent Shrine corta a " + opp.char.name + " (-100 HP)");
+            p.domain--;
+        }
+        
+        // Mahito Domain
+        if(p.domain > 0 && p.char.id === 'mahito') {
+            p.domain--;
+        }
+
+        if(p.awake > 0) p.awake--;
+    });
 }
 
-function addLog(text, className = "") {
-    const log = document.getElementById('battle-log');
-    const entry = document.createElement('div');
-    entry.className = 'log-entry ' + className;
-    entry.innerText = text;
-    log.prepend(entry);
+function applyResult(atk, def, res) {
+    def.hp -= res.dmg;
+    atk.ce -= getCost(atk.move, atk);
+    if(res.msg) addLog(atk.char.name + ": " + res.msg);
+}
+
+function getCost(m, p) {
+    if(m === 'GE' || m === 'BE') return 1;
+    if(m === 'T') return 3;
+    if(m === 'A') return p.awake === 0 ? p.char.awakeCost : 8; // 8 si es la Ulti
+    return 0;
+}
+
+function distributeCE() {
+    let gain = 1;
+    if(state.turn === 1) gain = 0;
+    else if(state.turn % 5 === 0) gain = 3;
+    else if(state.turn % 2 === 0) gain = 2;
+    state.p1.ce = Math.min(15, state.p1.ce + gain);
+    state.p2.ce = Math.min(15, state.p2.ce + gain);
 }
 
 function updateUI() {
-    updatePlayerUI(1, game.p1);
-    updatePlayerUI(2, game.p2);
+    document.getElementById('p1-hp').style.width = (state.p1.hp/7.5) + "%";
+    document.getElementById('p2-hp').style.width = (state.p2.hp/7.5) + "%";
+    document.getElementById('p1-ce').innerText = "E: " + state.p1.ce;
+    document.getElementById('p2-ce').innerText = "E: " + state.p2.ce;
+    document.getElementById('p1-name').innerText = (state.p1.awake > 0 && state.p1.char.id === 'yuji') ? "Sukuna" : state.p1.char.name;
+    document.getElementById('p2-name').innerText = (state.p2.awake > 0 && state.p2.char.id === 'yuji') ? "Sukuna" : state.p2.char.name;
+    
+    // Cambiar textos de botones si está despierto
+    const p = state.activeP === 1 ? state.p1 : state.p2;
+    document.getElementById('p-turn-indicator').innerText = "TURNO JUGADOR " + state.activeP;
+    document.getElementById('btn-awake').innerText = p.awake > 0 ? "🔱 ULTIMATE (8E)" : "👁️ DESPERTAR ("+p.char.awakeCost+"E)";
 }
 
-function updatePlayerUI(n, p) {
-    const hpBar = document.getElementById(`p${n}-hp`);
-    const ceBar = document.getElementById(`p${n}-ce`);
-    const per = (p.hp / 750) * 100;
-    hpBar.style.width = per + "%";
-    hpBar.style.backgroundColor = per > 50 ? "#2ecc71" : per > 25 ? "#f1c40f" : "#e74c3c";
-    ceBar.innerText = `E: ${p.ce}`;
-    ceBar.style.color = `rgb(${p.ce * 15}, 100, 255)`;
+function addLog(msg, special = false) {
+    const l = document.getElementById('log');
+    const d = document.createElement('div');
+    d.className = 'log-msg' + (special ? ' log-special' : '');
+    d.innerText = msg;
+    l.prepend(d);
 }
 
-function cpuBrain() {
-    const p = game.p2;
-    if(p.ce >= p.char.awakeCost && Math.random() > 0.7) return 'A';
-    if(p.ce >= p.char.techCost) return 'T';
+function cpuMove() {
+    const p = state.p2;
+    if(p.ce >= 10) return 'A';
+    if(p.ce >= 3 && Math.random() > 0.4) return 'T';
     return Math.random() > 0.5 ? 'GE' : 'GN';
 }
 
-function checkWin() {
-    if(game.p1.hp <= 0 || game.p2.hp <= 0) {
-        const winner = game.p1.hp > 0 ? game.p1.char.name : game.p2.char.name;
-        alert("FIN: GANADOR " + winner);
+function checkGameOver() {
+    if(state.p1.hp <= 0 || state.p2.hp <= 0) {
+        alert("BATALLA TERMINADA");
         location.reload();
     }
 }
