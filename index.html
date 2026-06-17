@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>JJK: Cursed Battle</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --p1-color: #4a90e2;
+            --p2-color: #e24a4a;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            justify-content: space-between;
+        }
+
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            height: 60px;
+        }
+
+        .stat-box {
+            display: flex;
+            flex-direction: column;
+            width: 45%;
+        }
+
+        .hp-bar {
+            height: 20px;
+            background: #333;
+            border: 2px solid #fff;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .hp-fill {
+            height: 100%;
+            width: 100%;
+            transition: width 0.5s, background-color 0.5s;
+        }
+
+        .ce-text {
+            font-weight: bold;
+            font-size: 14px;
+            margin-top: 5px;
+            transition: color 0.3s;
+        }
+
+        /* Área central de mensajes */
+        #log {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            font-size: 0.9em;
+            text-align: center;
+            background: rgba(0,0,0,0.3);
+            border-top: 1px solid #444;
+            border-bottom: 1px solid #444;
+        }
+
+        /* Botones de acción vertical */
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding: 15px;
+            background: #222;
+        }
+
+        .btn-action {
+            padding: 12px 5px;
+            border: 2px solid #555;
+            border-radius: 8px;
+            background: #333;
+            color: white;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.1s, border-color 0.3s;
+        }
+
+        .btn-action:active { transform: scale(0.95); }
+        .btn-action.selected { border-color: #00ff00; background: #444; }
+        .btn-action.disabled { opacity: 0.5; pointer-events: none; }
+
+        .emoji { font-size: 20px; margin-bottom: 4px; }
+        .cost { font-size: 10px; color: #aaa; }
+
+        /* Pantallas de Selección */
+        #setup-screen, #char-selection {
+            position: fixed;
+            inset: 0;
+            background: #111;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .timer { font-size: 30px; color: #ff0000; font-weight: bold; }
+
+        .hidden { display: none !important; }
+
+        /* Colores dinámicos */
+        .hp-high { background-color: #2ecc71; }
+        .hp-mid { background-color: #f1c40f; }
+        .hp-low { background-color: #e74c3c; }
+
+        .courtroom-ui {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Pantalla Inicial -->
+    <div id="setup-screen">
+        <h1>JUJUTSU BATTLE</h1>
+        <button onclick="startGame('single')" style="padding:15px; margin:10px; width:200px">Single Player (IA)</button>
+        <button onclick="startGame('local')" style="padding:15px; margin:10px; width:200px">Local (P1 vs P2)</button>
+    </div>
+
+    <!-- Selección de Personaje -->
+    <div id="char-selection" class="hidden">
+        <h2 id="selector-title">Jugador 1: Elige</h2>
+        <div class="timer" id="selection-timer">10</div>
+        <div id="char-list" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;"></div>
+    </div>
+
+    <div id="game-container" class="hidden">
+        <!-- HUD Superior -->
+        <div class="hud">
+            <div class="stat-box">
+                <span id="p1-name">P1</span>
+                <div class="hp-bar"><div id="p1-hp-fill" class="hp-fill hp-high"></div></div>
+                <div id="p1-ce" class="ce-text">E: 2</div>
+            </div>
+            <div class="stat-box" style="text-align: right;">
+                <span id="p2-name">P2</span>
+                <div class="hp-bar"><div id="p2-hp-fill" class="hp-fill hp-high"></div></div>
+                <div id="p2-ce" class="ce-text">E: 2</div>
+            </div>
+        </div>
+
+        <!-- Log de Combate -->
+        <div id="log">
+            <p>¡Inicia la batalla!</p>
+            <p id="turn-display">Turno: 1</p>
+        </div>
+
+        <!-- Controles -->
+        <div id="p-controls" class="controls">
+            <button class="btn-action" onclick="selectMove('GN')">
+                <span class="emoji">👊</span> Golpe Normal <span class="cost">0 E</span>
+            </button>
+            <button class="btn-action" onclick="selectMove('GE')">
+                <span class="emoji">🔥</span> Golpe Energía <span class="cost">1 E</span>
+            </button>
+            <button class="btn-action" onclick="selectMove('BN')">
+                <span class="emoji">🛡️</span> Bloqueo Normal <span class="cost">0 E</span>
+            </button>
+            <button class="btn-action" onclick="selectMove('BE')">
+                <span class="emoji">💧</span> Bloqueo Energía <span class="cost">1 E</span>
+            </button>
+            <button class="btn-action" id="btn-tech" onclick="selectMove('T')">
+                <span class="emoji">⚔️</span> Técnica <span id="tech-cost" class="cost">3 E</span>
+            </button>
+            <button class="btn-action" id="btn-awake" onclick="selectMove('A')">
+                <span class="emoji">👁️</span> Despertar <span id="awake-cost" class="cost">10 E</span>
+            </button>
+        </div>
+    </div>
+
+<script>
+/* CONFIGURACIÓN Y DATOS */
+const CHARACTERS = {
+    sorcerers: [
+        { id: 'yuji', name: 'Yuji Itadori', tech: 'Golpe Concentrado', techCost: 3, awake: 'Sukuna', awakeCost: 10, techType: 'GN' },
+        { id: 'gojo', name: 'Satoru Gojo', tech: 'Seis Ojos', techCost: 3, awake: 'Infinito', awakeCost: 10, techType: 'GE' },
+        { id: 'hakari', name: 'Kinji Hakari', tech: 'Puerta', techCost: 3, awake: 'Expansión', awakeCost: 10, techType: 'GN' },
+        { id: 'higuruma', name: 'Hiromi Higuruma', tech: 'Masazo', techCost: 3, awake: 'Juicio', awakeCost: 10, techType: 'GN' },
+        { id: 'megumi', name: 'Megumi Fushiguro', tech: 'Sombras I', techCost: 3, awake: 'Mahoraga', awakeCost: 8, techType: 'GN' },
+        { id: 'yuta', name: 'Yuta Okkotsu', tech: 'Copiar I', techCost: 3, awake: 'Rika', awakeCost: 10, techType: 'GE' },
+        { id: 'geto', name: 'Geto Suguru', tech: 'Maldiciones', techCost: 3, awake: 'Uzumaki', awakeCost: 10, techType: 'GN' }
+    ],
+    curses: [
+        { id: 'mahito', name: 'Mahito', tech: 'Transfiguración', techCost: 3, awake: 'Inspiración', awakeCost: 10, techType: 'GN' },
+        { id: 'jogo', name: 'Jogo', tech: 'Bola de Fuego', techCost: 3, awake: 'Ataúd', awakeCost: 8, techType: 'GE' },
+        { id: 'hanami', name: 'Hanami', tech: 'Raíces', techCost: 3, awake: 'Mar de Flores', awakeCost: 8, techType: 'GN' },
+        { id: 'dagon', name: 'Dagon', tech: 'Agua', techCost: 3, awake: 'Ira', awakeCost: 8, techType: 'GN' },
+        { id: 'subway', name: 'Maldición Metro', tech: 'Mordida', techCost: 3, awake: '¡Veneno!', awakeCost: 8, techType: 'GN' },
+        { id: 'naoya', name: 'Naoya Zenin', tech: '24 Fotogramas', techCost: 3, awake: 'Reencarnar', awakeCost: 10, techType: 'GN' },
+        { id: 'kuro', name: 'Kurouroshi', tech: 'Corte', techCost: 3, awake: 'Horda', awakeCost: 8, techType: 'GN' }
+    ]
+};
+
+let gameState = {
+    mode: 'single',
+    turn: 1,
+    p1: { hp: 750, ce: 2, char: null, move: null, team: '', awakeTurns: 0, jackpot: false, oxe: 0 },
+    p2: { hp: 750, ce: 2, char: null, move: null, team: '', awakeTurns: 0, jackpot: false, oxe: 0 },
+    currentPlayerSelecting: 1,
+    selectionTimer: null
+};
+
+/* LÓGICA DE INICIO */
+function startGame(mode) {
+    gameState.mode = mode;
+    document.getElementById('setup-screen').classList.add('hidden');
+    document.getElementById('char-selection').classList.remove('hidden');
+    
+    // Asignar equipos aleatorios
+    const teams = Math.random() > 0.5 ? ['sorcerers', 'curses'] : ['curses', 'sorcerers'];
+    gameState.p1.team = teams[0];
+    gameState.p2.team = teams[1];
+    
+    startSelection();
+}
+
+function startSelection() {
+    const p = gameState.currentPlayerSelecting === 1 ? gameState.p1 : gameState.p2;
+    document.getElementById('selector-title').innerText = `Jugador ${gameState.currentPlayerSelecting}: Elige tu ${p.team}`;
+    
+    const list = document.getElementById('char-list');
+    list.innerHTML = '';
+    
+    CHARACTERS[p.team].forEach(char => {
+        const btn = document.createElement('button');
+        btn.innerText = char.name;
+        btn.style.padding = "10px";
+        btn.onclick = () => confirmSelection(char);
+        list.appendChild(btn);
+    });
+
+    let timeLeft = 10;
+    const timerElem = document.getElementById('selection-timer');
+    timerElem.innerText = timeLeft;
+    
+    clearInterval(gameState.selectionTimer);
+    gameState.selectionTimer = setInterval(() => {
+        timeLeft--;
+        timerElem.innerText = timeLeft;
+        if(timeLeft <= 0) {
+            const randomChar = CHARACTERS[p.team][Math.floor(Math.random() * 7)];
+            confirmSelection(randomChar);
+        }
+    }, 1000);
+}
+
+function confirmSelection(char) {
+    clearInterval(gameState.selectionTimer);
+    if(gameState.currentPlayerSelecting === 1) {
+        gameState.p1.char = char;
+        gameState.currentPlayerSelecting = 2;
+        if(gameState.mode === 'single') {
+            gameState.p2.char = CHARACTERS[gameState.p2.team][Math.floor(Math.random() * 7)];
+            initBattle();
+        } else {
+            startSelection();
+        }
+    } else {
+        gameState.p2.char = char;
+        initBattle();
+    }
+}
+
+function initBattle() {
+    document.getElementById('char-selection').classList.add('hidden');
+    document.getElementById('game-container').classList.remove('hidden');
+    document.getElementById('p1-name').innerText = gameState.p1.char.name;
+    document.getElementById('p2-name').innerText = gameState.p2.char.name;
+    updateUI();
+}
+
+/* LÓGICA DE COMBATE */
+function selectMove(moveId) {
+    const p1 = gameState.p1;
+    // Validar coste
+    const cost = getMoveCost(moveId, p1);
+    if(p1.ce < cost && !p1.jackpot) return alert("No tienes suficiente Energía Maldita");
+
+    p1.move = moveId;
+    
+    if(gameState.mode === 'single') {
+        gameState.p2.move = cpuChooseMove();
+        processTurn();
+    } else {
+        // En local, ocultar botones para P2
+        document.getElementById('p-controls').classList.add('hidden');
+        setTimeout(() => {
+            alert("Jugador 2, tu turno");
+            document.getElementById('p-controls').classList.remove('hidden');
+            // Aquí el segundo jugador elegiría. Por simplicidad en este ejemplo,
+            // procesaremos tras la elección del P2 si el sistema fuera más robusto.
+            // Para el prototipo, vamos a simular el flujo simultáneo:
+            if(!gameState.p2.move) {
+                 gameState.p2.move = 'GN'; // Temporal para test
+                 processTurn();
+            }
+        }, 100);
+    }
+}
+
+function getMoveCost(moveId, p) {
+    if(moveId === 'GE') return 1;
+    if(moveId === 'BE') return 1;
+    if(moveId === 'T') return p.char.techCost;
+    if(moveId === 'A') return p.char.awakeCost;
+    return 0;
+}
+
+function processTurn() {
+    const p1 = gameState.p1;
+    const p2 = gameState.p2;
+    const log = document.getElementById('log');
+    log.innerHTML = `<p id="turn-display">Turno: ${gameState.turn}</p>`;
+
+    // Resolver Daños
+    const d1 = calculateDamage(p1, p2);
+    const d2 = calculateDamage(p2, p1);
+
+    applyDamage(p2, d1.dmg, d1.msg);
+    applyDamage(p1, d2.dmg, d2.msg);
+
+    // Descontar Energía
+    if(!p1.jackpot) p1.ce -= getMoveCost(p1.move, p1);
+    if(!p2.jackpot) p2.ce -= getMoveCost(p2.move, p2);
+
+    // Siguiente Turno
+    gameState.turn++;
+    distributeEnergy();
+    updateUI();
+    
+    p1.move = null;
+    p2.move = null;
+
+    checkGameOver();
+}
+
+function calculateDamage(attacker, defender) {
+    let dmg = 0;
+    let type = 'GN';
+    let msg = `${attacker.char.name} usa `;
+
+    switch(attacker.move) {
+        case 'GN': dmg = 50; type = 'GN'; msg += "Golpe Normal"; break;
+        case 'GE': dmg = 75; type = 'GE'; msg += "Golpe con Energía"; break;
+        case 'T': 
+            dmg = 100; // Simplificado para el motor base
+            type = attacker.char.techType;
+            msg += attacker.char.tech;
+            break;
+        case 'A':
+            attacker.awakeTurns = 8;
+            msg += "¡DESPERTAR!";
+            break;
+    }
+
+    // Lógica de Bloqueo
+    if(defender.move === 'BN' && type === 'GN') dmg = Math.max(0, dmg - 50);
+    if(defender.move === 'BE' && type === 'GE') dmg = Math.max(0, dmg - 75);
+
+    return { dmg, msg };
+}
+
+function applyDamage(target, amount, msg) {
+    target.hp -= amount;
+    if(target.hp < 0) target.hp = 0;
+    const log = document.getElementById('log');
+    log.innerHTML += `<p>${msg} causando ${amount} de daño.</p>`;
+}
+
+function distributeEnergy() {
+    const t = gameState.turn;
+    let gain = 1;
+    if(t === 1) gain = 0;
+    else if(t % 5 === 0) gain = 3;
+    else if(t % 2 === 0) gain = 2;
+
+    if(gameState.p1.oxe <= 0) gameState.p1.ce = Math.min(15, gameState.p1.ce + gain);
+    if(gameState.p2.oxe <= 0) gameState.p2.ce = Math.min(15, gameState.p2.ce + gain);
+}
+
+/* UI Y AUXILIARES */
+function updateUI() {
+    updateBars(1, gameState.p1);
+    updateBars(2, gameState.p2);
+}
+
+function updateBars(num, p) {
+    const hpFill = document.getElementById(`p${num}-hp-fill`);
+    const ceText = document.getElementById(`p${num}-ce`);
+    
+    const hpPer = (p.hp / 750) * 100;
+    hpFill.style.width = hpPer + "%";
+    
+    // Color HP
+    hpFill.className = "hp-fill " + (hpPer > 50 ? "hp-high" : hpPer > 20 ? "hp-mid" : "hp-low");
+    
+    // Color CE (Blue to Black/Red)
+    ceText.innerText = `E: ${p.ce}`;
+    const ceColor = `rgb(${p.ce * 15}, 0, ${255 - (p.ce * 15)})`;
+    ceText.style.color = ceColor;
+}
+
+function cpuChooseMove() {
+    const p = gameState.p2;
+    if(p.ce >= p.char.techCost && Math.random() > 0.5) return 'T';
+    if(p.ce >= 1 && Math.random() > 0.3) return 'GE';
+    return 'GN';
+}
+
+function checkGameOver() {
+    if(gameState.p1.hp <= 0 || gameState.p2.hp <= 0) {
+        alert("FIN DEL JUEGO");
+        location.reload();
+    }
+}
+</script>
+</body>
+</html>
